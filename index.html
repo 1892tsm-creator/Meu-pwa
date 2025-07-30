@@ -59,6 +59,21 @@
             max-width: 100%;
         }
         
+        /* NOVO: Container de pesquisa */
+        .search-container {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        #searchInput {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #e0d5c8;
+            border-radius: 4px;
+            font-family: 'Montserrat', sans-serif;
+        }
+        
         .controls {
             display: flex;
             flex-direction: column;
@@ -164,7 +179,7 @@
             background-color: rgba(249, 244, 230, 0.5);
         }
         
-        input, select {
+        input, select, textarea {
             font-family: 'Montserrat', sans-serif;
             width: 100%;
             padding: 8px 10px;
@@ -175,7 +190,13 @@
             transition: all 0.3s ease;
         }
         
-        input:focus, select:focus {
+        /* NOVO: Estilo específico para textarea */
+        .description-cell textarea {
+            min-height: 40px;
+            resize: vertical;
+        }
+        
+        input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: #8c6a56;
             box-shadow: 0 0 0 2px rgba(140, 106, 86, 0.2);
@@ -299,6 +320,13 @@
 <body>
     <div class="container">
         <h1>Livro Caixa</h1>
+        
+        <!-- NOVO: Campo de pesquisa -->
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Pesquisar por descrição...">
+            <button id="search-btn" class="secondary">Pesquisar</button>
+            <button id="clear-search" class="secondary">Limpar</button>
+        </div>
         
         <div class="controls">
             <button id="add-row">+ Adicionar</button>
@@ -437,16 +465,17 @@
             const totalExpensesEl = document.getElementById('total-expenses');
             const currentBalanceEl = document.getElementById('current-balance');
             
-            // Variável para controlar alterações não salvas
+            // NOVO: Variáveis para pesquisa
+            const searchInput = document.getElementById('searchInput');
+            const searchBtn = document.getElementById('search-btn');
+            const clearSearchBtn = document.getElementById('clear-search');
+            
             let unsavedChanges = false;
             
-            // Load saved data from localStorage
             loadSavedData();
-            
-            // Calculate totals initially
             calculateTotals();
             
-            // Event listeners - corrigido para prevenir comportamento padrão
+            // Event listeners
             addRowBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 addNewRow();
@@ -486,7 +515,18 @@
                 importData(e);
             });
             
-            // Verifica alterações não salvas ao sair da página
+            // NOVO: Event listeners para pesquisa
+            searchBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                applySearch();
+            });
+            
+            clearSearchBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                searchInput.value = '';
+                applySearch();
+            });
+            
             window.addEventListener('beforeunload', (e) => {
                 if (unsavedChanges) {
                     e.preventDefault();
@@ -519,13 +559,13 @@
                 });
                 typeCell.appendChild(typeSelect);
                 
-                // Description cell
+                // Descrição cell (AGORA COM TEXTAREA)
                 const descCell = document.createElement('td');
-                const descInput = document.createElement('input');
-                descInput.type = 'text';
-                descInput.placeholder = 'Descrição...';
-                descInput.value = data.description || '';
-                descCell.appendChild(descInput);
+                descCell.className = 'description-cell';
+                const descTextarea = document.createElement('textarea');
+                descTextarea.placeholder = 'Descrição...';
+                descTextarea.value = data.description || '';
+                descCell.appendChild(descTextarea);
                 
                 // Amount cell
                 const amountCell = document.createElement('td');
@@ -563,7 +603,6 @@
                 });
                 actionsCell.appendChild(deleteBtn);
                 
-                // Add all cells to the row
                 row.appendChild(dateCell);
                 row.appendChild(typeCell);
                 row.appendChild(descCell);
@@ -571,7 +610,6 @@
                 row.appendChild(recurrentCell);
                 row.appendChild(actionsCell);
                 
-                // Add event listeners - apenas para cálculo, não salvamento
                 typeSelect.addEventListener('change', function() {
                     calculateTotals();
                     unsavedChanges = true;
@@ -584,7 +622,7 @@
                     updateSaveButtonState();
                 });
                 
-                descInput.addEventListener('input', () => {
+                descTextarea.addEventListener('input', () => {
                     unsavedChanges = true;
                     updateSaveButtonState();
                 });
@@ -599,15 +637,24 @@
                     updateSaveButtonState();
                 });
                 
-                // Add row to the table
                 tableBody.appendChild(row);
-                
-                // Focus on description input for quick entry
-                setTimeout(() => descInput.focus(), 50);
-                
-                // Marca como não salvo
+                setTimeout(() => descTextarea.focus(), 50);
                 unsavedChanges = true;
                 updateSaveButtonState();
+            }
+            
+            // NOVO: Função para aplicar pesquisa
+            function applySearch() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const rows = tableBody.querySelectorAll('tr');
+                
+                rows.forEach(row => {
+                    const description = row.querySelector('.description-cell textarea')?.value.toLowerCase() || '';
+                    const matchesSearch = searchTerm === '' || description.includes(searchTerm);
+                    row.style.display = matchesSearch ? '' : 'none';
+                });
+                
+                calculateTotals();
             }
             
             function updateSaveButtonState() {
@@ -664,7 +711,7 @@
                     data.push({
                         date: row.querySelector('input[type="date"]').value,
                         type: row.querySelector('select').value,
-                        description: row.querySelector('input[type="text"]').value,
+                        description: row.querySelector('.description-cell textarea').value,
                         amount: row.querySelector('input[type="number"]').value,
                         recurrent: row.querySelector('.recurrent-cell input[type="checkbox"]').checked
                     });
@@ -672,7 +719,6 @@
                 
                 localStorage.setItem('ledgerData', JSON.stringify(data));
                 
-                // Feedback visual
                 saveDataBtn.classList.add('success');
                 saveDataBtn.textContent = '✓ Salvo!';
                 setTimeout(() => {
@@ -818,7 +864,6 @@
                 };
                 reader.readAsText(file);
                 
-                // Reset input para permitir reimportar o mesmo arquivo
                 event.target.value = '';
             }
         });
